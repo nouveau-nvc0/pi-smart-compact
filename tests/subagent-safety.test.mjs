@@ -103,7 +103,7 @@ describe("U5 subagent same-session safety", () => {
     assert.ok(beforeResult?.compaction, "subagent smart_compact should customize summary in the same session");
     const compactOptions = mock.state.compactCalls[0]?.[0];
     assert.equal(typeof compactOptions?.onComplete, "function", "subagent continuation should wait for Pi's post-compaction callback");
-    await compactOptions.onComplete({});
+    await compactOptions.onComplete(beforeResult.compaction);
 
     assert.equal(mock.state.replacementSessionCalls.length, 0, "smart compaction must not call newSession/fork/switchSession for subagents");
     assert.deepEqual(

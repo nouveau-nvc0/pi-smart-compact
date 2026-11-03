@@ -92,6 +92,7 @@ Child-agent self-check: at a boundary, use `smart_compact` if it appears in the 
 5. Let the agent reach a natural stopping point. Verify the workflow: warning -> handoff -> `smart_compact` -> same-session compaction -> single continue.
 6. After the automatic `continue`, verify the agent resumes in the same session using the handoff summary, rather than a replacement session.
 7. Check that only one `continue` message is sent for that smart compaction.
+   It should arrive after compaction finishes, without typing another prompt. Manual `/compact` should not send an automatic `continue`.
 8. Run `/smart-boundary reset` when done.
 
 ## Subagent scenario
@@ -115,6 +116,8 @@ Expected behavior:
 - The pending stale handoff should be cleared/expired and not reused.
 - A later manual/native compaction or native compaction should proceed normally and must not use the stale handoff as its summary.
 - The agent or user may retry explicitly by calling `smart_compact` again with a fresh handoff after the failure/cancel path is understood.
+- Switching sessions or reloading the extension while smart compaction is pending must discard the old handoff; late callbacks must not continue work in the new session.
+- If another extension replaces the smart handoff summary, no automatic `continue` should be sent.
 - Manual compaction and native Pi auto-compaction without a pending smart handoff should remain unchanged.
 
 ## Limitations to check and explain

@@ -101,7 +101,7 @@ Next steps:
 
 If `smart_compact` is unavailable in the active toolset, the agent should return a final handoff-style response with the same fields instead of trying to continue expanding the task.
 
-After `smart_compact` starts compaction, the pending handoff is used by the `session_before_compact` hook as the compaction summary. When the matching `session_compact` event completes, the pending handoff is cleared and exactly one `continue` user message is sent in the same session.
+After `smart_compact` starts compaction, the pending handoff is used by the `session_before_compact` hook as the compaction summary. Once Pi calls `ctx.compact`'s `onComplete` callback, the extension checks that the completed summary belongs to that smart compaction, clears the pending handoff, and sends exactly one `continue` user message in the same session. This happens automatically; no extra user prompt is needed. The earlier `session_compact` event is not used to send messages because Pi may still be compacting at that point.
 
 ## Subagent tool access
 
@@ -119,6 +119,8 @@ Child agents can also self-check at a boundary: if `smart_compact` appears in th
 ## Failure, cancel, and native compaction behavior
 
 If smart compaction fails to start, errors, is cancelled, or cannot safely customize the summary, the pending stale handoff is cleared/expired. A later manual/native compaction is not overridden by that stale handoff, no automatic `continue` is sent for the failed flow, and the agent or user may retry explicitly by calling `smart_compact` again with a fresh handoff.
+
+Starting or shutting down a session also expires any pending smart handoff. Late completion/error callbacks from that request cannot continue work in another session. If another extension replaces the smart summary, automatic continuation is skipped.
 
 Manual or native Pi compaction without a pending smart handoff behaves normally. Native pi auto-compaction remains unchanged and independent as the underlying safety net.
 

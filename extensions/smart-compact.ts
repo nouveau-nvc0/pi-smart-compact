@@ -46,7 +46,12 @@ export default function smartCompactExtension(pi: ExtensionAPI) {
   const runtimeState = createSmartCompactRuntimeState();
 
   pi.on("session_start", () => {
+    expirePendingSmartCompaction(runtimeState);
     resetEscalationState(runtimeState);
+  });
+
+  pi.on("session_shutdown", () => {
+    expirePendingSmartCompaction(runtimeState);
   });
 
   pi.on("turn_end", async (_event, ctx) => {
@@ -198,11 +203,24 @@ function prepareSmartCompactionSummary(
 async function continueAfterSmartCompaction(
   pi: ExtensionAPI,
   pendingId: string,
+  result: Parameters<NonNullable<CompactOptions["onComplete"]>>[0],
   ctx: ExtensionContext,
   runtimeState: SmartCompactRuntimeState,
 ): Promise<void> {
   const pending = getPendingSmartCompaction(runtimeState);
   if (!pending || pending.id !== pendingId) {
+    return;
+  }
+
+  const details = result.details;
+  if (
+    typeof details !== "object" ||
+    details === null ||
+    !("smartCompactionId" in details) ||
+    details.smartCompactionId !== pending.id
+  ) {
+    expirePendingSmartCompaction(runtimeState, pending.id);
+    notifyIfAvailable(ctx, "Compaction completed without the smart handoff. Automatic continuation was skipped.", "warning");
     return;
   }
 
@@ -248,10 +266,13 @@ async function executeSmartCompact(
 
   let callbackError: Error | undefined;
   const compactOptions: CompactOptions = {
-    onComplete: async () => {
-      await continueAfterSmartCompaction(pi, pending.id, ctx, runtimeState);
+    onComplete: async (result) => {
+      await continueAfterSmartCompaction(pi, pending.id, result, ctx, runtimeState);
     },
     onError: (error) => {
+      if (getPendingSmartCompaction(runtimeState)?.id !== pending.id) {
+        return;
+      }
       callbackError = error;
       expirePendingSmartCompaction(runtimeState, pending.id);
       notifyIfAvailable(ctx, `Smart compaction failed: ${errorMessage(error)}`, "error");
