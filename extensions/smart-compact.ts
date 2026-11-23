@@ -228,7 +228,14 @@ async function continueAfterSmartCompaction(
   resetEscalationState(runtimeState);
 
   try {
-    await Promise.resolve(pi.sendUserMessage("continue", { deliverAs: "followUp" }));
+    // The pre-compaction boundary warning survives in the kept tail; a bare "continue" lets the
+    // model mistake that stale warning for current state and compact again.
+    await Promise.resolve(
+      pi.sendUserMessage(
+        "continue — smart compaction is complete and the context is now below the boundary. Any earlier smart compaction warnings in this conversation are stale; do not call smart_compact unless a new warning is delivered.",
+        { deliverAs: "followUp" },
+      ),
+    );
     notifyIfAvailable(ctx, "Smart compaction completed. Continuing the same session.");
   } catch (error) {
     notifyIfAvailable(ctx, `Smart compaction completed, but automatic continuation could not be sent: ${errorMessage(error)}`, "error");
